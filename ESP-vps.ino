@@ -97,7 +97,7 @@ void sendDataToServer() {
                       "&soilMoisture=" + String(soilMoisture);
 
     // Настройка HTTP-запроса
-    http.begin(client, "http://btb.com.ua/data.php");
+    http.begin(client, "your.website");
     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
     // Отправка данных
