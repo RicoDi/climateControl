@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Управление системой</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f4f4f9;
+    }
+    h1 {
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .sensor-data, .control-section {
+      margin-bottom: 20px;
+    }
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Управление системой</h1>
+    <div class="sensor-data">
+      <h2>Данные датчиков</h2>
+      <p><strong>Температура внутри:</strong> <span id="temperatureIn"></span> °C</p>
+      <p><strong>Влажность внутри:</strong> <span id="humidityIn"></span> %</p>
+      <p><strong>Температура снаружи:</strong> <span id="temperatureOut"></span> °C</p>
+      <p><strong>Влажность снаружи:</strong> <span id="humidityOut"></span> %</p>
+      <p><strong>Влажность почвы:</strong> <span id="soilMoisture"></span>%</p>
+    </div>
+    <div class="control-section">
+      <h2>Управление</h2>
+      <button class="button" id="start-pump">Запустить насос</button>
+      <button class="button" id="stop-pump">Остановить насос</button>
+    </div>
+  </div>
+  <script>
+    // URL API вашего сервера
+    const API_URL = "https://btb.com.ua";
+
+    // Функция для обновления данных датчиков
+    async function fetchSensorData() {
+      try {
+        const response = await fetch(`${API_URL}/data.php`);
+        const data = await response.json();
+
+        document.getElementById('temperatureIn').innerText = data.temperatureIn || '--';
+        document.getElementById('humidityIn').innerText = data.humidityIn || '--';
+        document.getElementById('temperatureOut').innerText = data.temperatureOut || '--';
+        document.getElementById('humidityOut').innerText = data.humidityOut || '--';
+        document.getElementById('soilMoisture').innerText = data.soilMoisture || '--';
+      } catch (error) {
+        console.error('Ошибка получения данных:', error);
+      }
+    }
+
+    // Функция для отправки команды управления
+    async function sendControlCommand(command) {
+      try {
+        const response = await fetch(`${API_URL}/control`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(command)
+        });
+        const data = await response.json();
+        alert(data.message || "Команда отправлена!");
+      } catch (error) {
+        console.error('Ошибка отправки команды:', error);
+        alert("Ошибка отправки команды!");
+      }
+    }
+
+    // События кнопок управления
+    document.getElementById('start-pump').addEventListener('click', () => {
+      sendControlCommand({ command: 'start_pump' });
+    });
+
+    document.getElementById('stop-pump').addEventListener('click', () => {
+      sendControlCommand({ command: 'stop_pump' });
+    });
+
+    // Обновление данных датчиков каждые 5 секунд
+    setInterval(fetchSensorData, 5000);
+    fetchSensorData();
+  </script>
+</body>
+</html>

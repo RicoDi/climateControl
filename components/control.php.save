@@ -1,0 +1,52 @@
+<?php
+// ESP8266 API URL
+$ESP_URL = "http://<ESP8266_IP_ADDRESS>/fan";
+
+// Получаем запрос от веб-интерфейса
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $fan = $_POST['fan'] ?? null; // Тип вентилятора: in/out
+    $state = $_POST['state'] ?? null; // Состояние: on/off
+
+    // Проверяем входные данные
+    if ($fan !== "in" && $fan !== "out") {
+        http_response_code(400);
+        echo json_encode(["error" => "Invalid fan type"]);
+        exit;
+    }
+    if ($state !== "on" && $state !== "off") {
+        http_response_code(400);
+        echo json_encode(["error" => "Invalid state"]);
+        exit;
+    }
+
+    // Формируем запрос к ESP8266
+    $data = http_build_query([
+        "fan" => $fan,
+        "state" => $state
+    ]);
+
+    $options = [
+        "http" => [
+            "header"  => "Content-type: application/x-www-form-urlencoded\r\n",
+            "method"  => "POST",
+            "content" => $data
+        ]
+    ];
+
+    $context = stream_context_create($options);
+    $result = @file_get_contents($ESP_URL, false, $context);
+
+    // Обработка ответа от ESP8266
+    if ($result === FALSE) {
+        http_response_code(500);
+        echo json_encode(["error" => "Failed to connect to ESP8266"]);
+        exit;
+    }
+
+    // Возвращаем результат
+    echo json_encode(["success" => true, "response" => $result]);
+} else {
+    http_response_code(405);
+    echo json_encode(["error" => "Invalid request method"]);
+}
+?>

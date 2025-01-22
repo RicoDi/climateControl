@@ -1,10 +1,12 @@
 #include <DHT.h>
 
-#define DHTPIN_INSIDE A1 // Датчик внутри гроубокса
+#define DHTPIN_INSIDE A1  // Датчик внутри гроубокса
 #define DHTPIN_OUTSIDE A2 // Датчик снаружи
 #define DHTTYPE DHT11
 
 #define SOIL_MOISTURE_PIN A3 // Датчик влажности почвы
+#define FAN_IN_PIN 22         // Входной вентилятор
+#define FAN_OUT_PIN 23        // Выходной вентилятор
 
 DHT dhtInside(DHTPIN_INSIDE, DHTTYPE);
 DHT dhtOutside(DHTPIN_OUTSIDE, DHTTYPE);
@@ -13,17 +15,21 @@ float humidityIn = 0, temperatureIn = 0;
 float humidityOut = 0, temperatureOut = 0;
 int soilMoisture = 0;
 
-String kirim = "";
-
+String incomingCommand = ""; // Для команд от ESP
 unsigned long previousMillis = 0;
-const unsigned long interval = 1000; // Интервал в миллисекундах
+const unsigned long interval = 1000;
 
 void setup() {
-  Serial.begin(9600);    // Для отладки
   Serial3.begin(115200); // Для связи с ESP8266
+  Serial.begin(9600);    // Для отладки
+
   dhtInside.begin();
   dhtOutside.begin();
-  kirim.reserve(64); // Резервируем память для строки
+
+  pinMode(FAN_IN_PIN, OUTPUT);
+  pinMode(FAN_OUT_PIN, OUTPUT);
+  digitalWrite(FAN_IN_PIN, LOW);
+  digitalWrite(FAN_OUT_PIN, LOW);
 }
 
 void loop() {
@@ -34,14 +40,14 @@ void loop() {
     // Считываем данные с датчиков
     readSensors();
 
-    // Подготавливаем строку для отправки
-    prepareData();
+    // Отправляем данные на ESP
+    sendDataToESP();
+  }
 
-    // Отправляем данные на ESP8266
-    sendData();
-
-    // Проверяем и выводим ответ от ESP
-    checkESPResponse();
+  // Читаем команды от ESP
+  if (Serial3.available()) {
+    incomingCommand = Serial3.readStringUntil('\n');
+    handleCommand(incomingCommand);
   }
 }
 
@@ -50,51 +56,32 @@ void readSensors() {
   temperatureIn = dhtInside.readTemperature();
   humidityOut = dhtOutside.readHumidity();
   temperatureOut = dhtOutside.readTemperature();
-  
-  // Чтение влажности почвы с усреднением и калибровкой
-  int soilMoistureRaw = readSoilMoisture();
-  soilMoisture = map(soilMoistureRaw, 300, 700, 0, 100); // Калибровка
-  soilMoisture = constrain(soilMoisture, 0, 100); // Ограничиваем диапазон
 
-  // Проверяем данные на ошибки
-  if (isnan(humidityIn) || isnan(temperatureIn)) {
-    Serial.println("Ошибка чтения датчика внутри!");
-    humidityIn = 0;
-    temperatureIn = 0;
-  }
-  if (isnan(humidityOut) || isnan(temperatureOut)) {
-    Serial.println("Ошибка чтения датчика снаружи!");
-    humidityOut = 0;
-    temperatureOut = 0;
-  }
+  int soilMoistureRaw = analogRead(SOIL_MOISTURE_PIN);
+  soilMoisture = map(soilMoistureRaw, 300, 700, 0, 100);
+  soilMoisture = constrain(soilMoisture, 0, 100);
 }
 
-void prepareData() {
-  kirim = String(humidityIn) + ";" +
-          String(temperatureIn) + ";" +
-          String(humidityOut) + ";" +
-          String(temperatureOut) + ";" +
-          String(soilMoisture) + "."; // Добавляем влажность почвы в данные
+void sendDataToESP() {
+  String data = String(humidityIn) + ";" + String(temperatureIn) + ";" +
+                String(humidityOut) + ";" + String(temperatureOut) + ";" +
+                String(soilMoisture) + ".";
+  Serial3.println(data);
+  Serial.println("Отправлено на ESP: " + data);
 }
 
-void sendData() {
-  Serial3.println(kirim);
-  Serial.println("Данные отправлены: " + kirim);
-}
-
-void checkESPResponse() {
-  if (Serial3.available()) {
-    String msg = Serial3.readStringUntil('\n'); // Читаем до символа новой строки
-    Serial.println("Ответ от ESP: " + msg);
-    // Вы можете добавить здесь логику для обработки ответа
+void handleCommand(String command) {
+  if (command == "FAN_IN_ON") {
+    digitalWrite(FAN_IN_PIN, HIGH);
+    Serial.println("Включен входной вентилятор");
+  } else if (command == "FAN_IN_OFF") {
+    digitalWrite(FAN_IN_PIN, LOW);
+    Serial.println("Выключен входной вентилятор");
+  } else if (command == "FAN_OUT_ON") {
+    digitalWrite(FAN_OUT_PIN, HIGH);
+    Serial.println("Включен выходной вентилятор");
+  } else if (command == "FAN_OUT_OFF") {
+    digitalWrite(FAN_OUT_PIN, LOW);
+    Serial.println("Выключен выходной вентилятор");
   }
-}
-
-int readSoilMoisture() {
-  int total = 0;
-  for (int i = 0; i < 10; i++) { // Считываем 10 значений для усреднения
-    total += analogRead(SOIL_MOISTURE_PIN);
-    delay(10); // Небольшая задержка для стабилизации
-  }
-  return total / 10; // Возвращаем усредненное значение
 }
